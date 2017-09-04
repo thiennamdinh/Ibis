@@ -28,7 +28,7 @@ contract Core {
 	controller = msg.sender;
     }
 
-    function upgrade(address _addr) isController {
+    function upgrade(address _addr) {
 	controller = _addr;
     }
 
@@ -65,7 +65,7 @@ contract Core {
     }
 
     function transfer(address _to, address _from,  uint256 _value) isApproved {
-	balances[_to] += _value;
-	balances[_from] -= _value;
+	balances[_to] -= _value;
+	balances[_from] += _value;
     }
 }

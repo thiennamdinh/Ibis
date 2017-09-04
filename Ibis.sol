@@ -4,6 +4,7 @@ import "./Token.sol";
 import "./Restricted.sol";
 import "./Core.sol";
 
+
 /// Implements the Ibis charity currency as an ERC20 token.
 contract Ibis is Token, Restricted {
 
@@ -38,7 +39,7 @@ contract Ibis is Token, Restricted {
 	core = Core(_core);
     }
 
-    /// Return the balance of an address
+    // Return the balance of an address
     function balanceOf(address _owner) constant returns (uint256) {
 	return core.balances(_owner);
     }
@@ -65,7 +66,8 @@ contract Ibis is Token, Restricted {
 
     /// Convert Ether to Ibis coins for the message sender
     function deposit() payable {
-	core.setBalances(msg.sender, core.balances(msg.sender) + msg.value);
+	//core.setBalances(msg.sender, core.balances(msg.sender) + msg.value);
+	core.setBalances(msg.sender, msg.value);
 	totalSupply += msg.value;
 	LogDeposit(msg.sender, msg.value);
     }

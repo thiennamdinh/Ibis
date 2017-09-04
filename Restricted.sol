@@ -46,28 +46,31 @@ contract Restricted {
 
     /// Function call must be approved by the stated threshold of owners
     modifier ownerVote(bytes32 _operation) {
-	require(checkOwnerVote(_operation));
-	_;
-	delete supportingOwners[_operation];
-	delete initBlock[_operation];
+	if(checkOwnerVote(_operation)) {
+	    _;
+	    delete supportingOwners[_operation];
+	    delete initBlock[_operation];
+	}
     }
 
     /// Funcion call must be approved by a majority of token stakeholders
     modifier publicVote(bytes32 _operation, bool supporting, uint percent) {
-	require(checkPublicVote(_operation, supporting, percent));
-	suspended = true;
-	_;
-	delete supportingPublic[_operation];
-	delete dissentingPublic[_operation];
-	delete initBlock[_operation];
-	suspended = false;
+	if(checkPublicVote(_operation, supporting, percent)) {
+	    suspended = true;
+	    _;
+	    delete supportingPublic[_operation];
+	    delete dissentingPublic[_operation];
+	    delete initBlock[_operation];
+	    suspended = false;
+	}
     }
 
     /// Function call will be delayed by a set number of blocks regardless of approval
     modifier delayed(bytes32 _operation) {
-	require(checkDelay(_operation));
-	_;
-	delete initBlock[_operation];
+	if(checkDelay(_operation)) {
+	    _;
+	    delete initBlock[_operation];
+	}
     }
 
     modifier suspend(bytes32 _operation) {
