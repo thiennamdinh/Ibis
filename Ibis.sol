@@ -2,11 +2,18 @@ pragma solidity ^0.4.13;
 
 import "./Token.sol";
 import "./Restricted.sol";
+import "./Democratic.sol";
+import "./Suspendable.sol";
 import "./Core.sol";
 
 
 /// Implements the Ibis charity currency as an ERC20 token.
-contract Ibis is Token, Restricted {
+contract Ibis is Token, Restricted, Democratic, Suspendable {
+
+    uint256 MAX_UINT256 = 2**256-1;
+    uint constant MAJORITY = 50;
+    uint constant SUPERMAJORITY = 67;
+    uint constant VOTE_DURATION = 960 * 7;         // # of blocks per voting period
 
     // human standard token fields
     string public name = "Ibis";
@@ -18,11 +25,15 @@ contract Ibis is Token, Restricted {
     Core core;
 
     // record keeping variables for
-    uint256 public awardMax;                   // maximum award that can be claimed in one block
-    uint public frozenMinTime;                 // min time between freezing and redistribution
-    uint public awardMinTime;                  // min time to wait for charities to claim reward
-    mapping(uint => uint256) awardValue;       // value of award at a given block
-    mapping(uint256 => address) awardClosest;  // current winning bid for block award
+    uint256 public awardMax;                      // maximum award that can be claimed in one block
+    uint public frozenMinTime;                    // min time between freezing and redistribution
+    uint public awardMinTime;                     // min time to wait for charities to claim reward
+    mapping(uint => uint256) awardValue;          // value of award at a given block
+    mapping(uint => address) awardClosest;        // current winning bid for block award
+
+    mapping(address => bool) frozenVoted;         // votes cast by previously frozen accounts
+
+    bool nuked;
 
     // non-ERC20 events
     event LogDeposit(address indexed _from, uint _value);
@@ -34,8 +45,10 @@ contract Ibis is Token, Restricted {
 
     /// Assign ownership of contract and establish Ibis as the charity firstonly
     function Ibis(address _core, address [] _owners, uint _ownerThreshold, address nukeMaster)
-        Restricted(_owners, _ownerThreshold, nukeMaster) {
-
+        Restricted(_owners, _ownerThreshold, nukeMaster)
+	Democratic(VOTE_DURATION)
+	Suspendable(nukeMaster)
+    {
 	core = Core(_core);
     }
 
@@ -147,6 +160,8 @@ contract Ibis is Token, Restricted {
 	}
     }
 
+    ///---------------------------------- Freeze Methods ------------------------------------///
+
     /// Suspend accounts by moving the existing balance into a frozen funds table
     function freezeAccounts(address[] _accounts) isOwner suspendable(sha3(msg.data)) {
 	uint blocknum = block.number + frozenMinTime;
@@ -187,8 +202,8 @@ contract Ibis is Token, Restricted {
 	    }
 	}
 	awardValue[block.number] = frozenAward;
-	awardClosest[block.number] = address(2**256 - 1);
-	LogAward(block.number, address(2**256-1), "initialized");
+	awardClosest[block.number] = address(MAX_UINT256);
+	LogAward(block.number, address(MAX_UINT256), "initialized");
     }
 
     /// Claim that a charity is the closest to the random target for a given award
@@ -233,36 +248,40 @@ contract Ibis is Token, Restricted {
 	awardMax = _awardMax;
     }
 
-    /// Moves all state core to a new version of the contract and destroys the current contract
-    function upgradeStandard(address _addrNew, bool supporting) ownerVote(sha3(msg.data))
-	publicVote(sha3(msg.data), supporting, MAJORITY) suspendable(sha3(msg.data)) {
-	upgrade(_addrNew);
+    ///---------------------------------- Nuke Methods -----------------------------------///
+
+    /// Supermajority vote to nuke the contract logic and allow free ether withdrawal
+    function nuke(bool supporting) suspend(sha3(msg.data)) votable(sha3(msg.data), SUPERMAJORITY) {
+	// somehow remove all ownership power from here on out
+	RestrictedDestruct();
+	nuked = true;
     }
 
-    /// Same result upgradeStandard(); intended for use when owner keys have been compromised
-    function upgradeEmergency(address _addrNew, bool supporting) isOwner suspend(sha3(msg.data))
-	publicVote(sha3(msg.data), supporting, SUPERMAJORITY) suspendable(sha3(msg.data)) {
-	upgrade(_addrNew);
-    }
-
-    /// Called by upgradeStandard() and upgradeEmergency()
-    function upgrade(address _addr) private {
-	if(IbisNew(_addr).init(totalSupply)) {
-	    core.upgrade(_addr);
-	    LogUpgrade(_addr);
-	    selfdestruct(_addr);
+    function disarmNuke() {
+	// if vote failed for nuke then call unsuspend()
+	if(issues[suspendOp].initBlock == 0) {
+	    unsuspend();
 	}
     }
 
-    /// Enable voting procedure based on stake in the currency
-    function votingStake(address _addr) internal returns (uint256) {
-	// frozen balances are typically negligible; must count to prevent administrative abuse
-	return core.balances(_addr) + core.frozenValue(_addr);
-    }
-}
+    ///---------------------------------- Upgrade Methods -----------------------------------///
 
+    /// Standard path to propose a new controlling contract
+    function upgradeInit(address _addrNew) ownerVote(sha3(msg.data)) suspendable(sha3(msg.data)) {
+	//TODO: finish upgrade method
+    }
+
+    /// Emergency path to upgrade contracts if majority owner keys have been compromised
+    function upgradeInitEmergency(address _addrNew) isOwner suspendable(sha3(msg.data)) {
+    }
+
+    /// Emergency path to upgrade contracts if majority owner keys have been compromised
+    function upgradeInitial(address _addrNew) isOwner()) {
+    }
+
+}
 /// Abstract contract placeholder to facilitate a future transition to the next version of Ibis
 contract IbisNew {
     /// This method will be implemented in the future contract version to process legacy data
-    function init(uint256 totalSupply) returns (bool);
+    function init(uint256 totalSupply);
 }
