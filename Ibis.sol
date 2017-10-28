@@ -47,7 +47,7 @@ contract Ibis is Token, Restricted, Democratic, Suspendable {
     function Ibis(address _core, address [] _owners, uint _ownerThreshold, address nukeMaster)
         Restricted(_owners, _ownerThreshold, nukeMaster)
 	Democratic(VOTE_DURATION)
-	Suspendable(nukeMaster)
+	Suspendable(nukeMaster, VOTE_DURATION)
     {
 	core = Core(_core);
     }
