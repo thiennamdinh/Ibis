@@ -1,22 +1,18 @@
 pragma solidity ^0.4.13;
 
-import "./Set.sol";
-
-//TODO: figure out Set business
-
 /// Defines various access striction modifiers to be used by inheriting class
 contract Restricted {
 
-    // Bind all functions of Set library to set datastructure
-    using Set for Set.set;
-
-    Set.set public owners;                         // set of addresses approved for decision making
-    uint ownerThreshold;                           // required number of owners in vote
+    uint256 MAX_UINT256 = 2**256-1;
+    uint numOwners;
+    uint threshold;
+    mapping(address => bool) public owners;
 
     address masterAddress;
 
-    mapping(bytes32 => Set.set) supportingOwners;  // map active votes to supporting owners
-    mapping(bytes32 => uint) initBlock;            // initial block that a multiowner issue was created
+    mapping(bytes32 => mapping(address => bool)) supporting;
+    mapping(bytes32 => uint) numSupporting;
+    mapping(bytes32 => uint) initBlock;
 
     uint delayDuration = 960;                      // # of blocks delayed by "delay" modifier
     // note: approximately 960 blocks are mined daily
@@ -30,7 +26,7 @@ contract Restricted {
 
     /// Function is only accessible to owners
     modifier isOwner() {
-	require(owners.contains(msg.sender));
+	require(owners[msg.sender] == true);
 	_;
     }
 
@@ -38,12 +34,11 @@ contract Restricted {
     modifier multiowner(bytes32 _operation) {
 	if(checkOwners(_operation)) {
 	    _;
-	    delete supportingOwners[_operation];
 	    delete initBlock[_operation];
 	}
     }
 
-    modifier isMasterAddress() {
+    modifier isMaster() {
 	if(msg.sender == masterAddress) {
 	    _;
 	}
@@ -60,25 +55,30 @@ contract Restricted {
     ///---------------------------------- Public Methods ------------------------------------///
 
     /// Constructor takes a list of owners and a threshold
-    function Restricted(address[] _ownerList, uint _ownerThreshold, address _masterAddress) {
-	ownerThreshold = _ownerThreshold;
+    function Restricted(address[] _ownerList, uint _threshold, address _masterAddress) {
+	threshold = _threshold;
+	LogChangeThreshold(threshold);
+
 	masterAddress = _masterAddress;
 
 	for(uint256 i = 0; i < _ownerList.length; i++) {
-	    owners.insert(_ownerList[i]);
+	    owners[_ownerList[i]] = true;
+	    numOwners++;
 	    LogOwnerChange(_ownerList[i], true);
 	}
     }
 
     /// Add address to list of owners
     function addOwner(address _owner) multiowner(sha3(msg.data)) delayed(sha3(msg.data)) {
-	owners.insert(_owner);
+	owners[_owner] = true;
+	numOwners++;
 	LogOwnerChange(_owner, true);
     }
 
     /// Remove address from list of owners
     function removeOwner(address _owner) multiowner(sha3(msg.data)) {
-	owners.remove(_owner);
+	owners[_owner] = false;
+	numOwners--;
 	LogOwnerChange(_owner, false);
     }
 
@@ -86,25 +86,25 @@ contract Restricted {
     function switchOwner(address _old, address _new) multiowner(sha3(msg.data))
 	delayed(sha3(msg.data)) {
 
-	removeOwner(_new);
-	addOwner(_old);
+	owners[_old] = false;
+	owners[_new] = true;
 
-	LogOwnerChange(_new, true);
 	LogOwnerChange(_old, false);
+	LogOwnerChange(_new, true);
     }
 
     /// Instantly remove oneself as an owner (useful if a key has been compromised)
     function removeSelf() isOwner {
-	owners.remove(msg.sender);
+	owners[msg.sender] = false;
 	LogOwnerChange(msg.sender, false);
     }
 
     /// Change the min number of approving owners
-    function changeThreshold(uint _ownerThreshold) multiowner(sha3(msg.data))
+    function changeThreshold(uint _threshold) multiowner(sha3(msg.data))
 	delayed(sha3(msg.data)) {
 
-	ownerThreshold = _ownerThreshold;
-	LogChangeThreshold(ownerThreshold);
+	threshold = _threshold;
+	LogChangeThreshold(threshold);
     }
 
     /// Change the duration of the delay modifier
@@ -120,18 +120,18 @@ contract Restricted {
 
     /// Allow an owner to revoke a previously approved call in a multi-owner vote
     function ownerRevoke(bytes32 _operation) isOwner {
-	supportingOwners[_operation].remove(msg.sender);
-	if(supportingOwners[_operation].size() == 0) {
-	    delete supportingOwners[_operation];
+	supporting[_operation][msg.sender] = false;
+	if(numSupporting[_operation] == 0) {
 	    delete initBlock[_operation];
 	}
     }
 
     /// Cast vote for a multi-owner function call and return true if the call has been approved
     function checkOwners(bytes32 _operation) private returns (bool) {
-	if(owners.contains(msg.sender)) {
-	    supportingOwners[_operation].insert(msg.sender);
-	    if(supportingOwners[_operation].size() >= ownerThreshold) {
+	if(owners[msg.sender] == true && supporting[_operation][msg.sender] == false) {
+	    supporting[_operation][msg.sender] == true;
+	    numSupporting[_operation]++;
+	    if(numSupporting[_operation] >= threshold) {
 		initBlock[_operation] = block.number;
 		return true;
 	    }
@@ -148,6 +148,6 @@ contract Restricted {
     }
 
     function RestrictedDestruct() internal {
-	//TODO delete all owners
+	threshold = MAX_UINT256;
     }
 }
