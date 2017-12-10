@@ -6,11 +6,11 @@ contract Democratic {
 	uint initBlock;
 	uint threshold;
 
-	mapping(address => uint256) supporting;
-	mapping(address => uint256) dissenting;
+	mapping(address => uint) supporting;
+	mapping(address => uint) dissenting;
 
-	uint256 supportingTotal;
-	uint256 dissentingTotal;
+	uint supportingTotal;
+	uint dissentingTotal;
     }
 
     // constructor-defined constants
@@ -25,7 +25,7 @@ contract Democratic {
     uint activeIssues;
     mapping(bytes32 => Issue) issues;           // map of active issues to be voted by the public
     mapping(address => uint) numParticipating;
-    mapping(address => uint256) votingBalance;  // balance that a user has spent on voting power
+    mapping(address => uint) votingBalance;  // balance that a user has spent on voting power
 
     /// Function call must be approved by a majority of token stakeholders
     modifier votable(bytes32 _operation, uint percent, bool suspend) {
@@ -144,7 +144,7 @@ contract Democratic {
 
     ///---------------------------------- Abstract Methods ----------------------------------///
 
-    function purchaseVotes(address _addr) internal returns (uint256) {
+    function purchaseVotes(address _addr) internal returns (uint) {
 	// implement in child to freeze funds, etc
     }
 

@@ -1,6 +1,5 @@
 // ./node_modules/.bin/testrpc -l 6700000
 
-
 fs = require('fs')
 Web3 = require('web3')
 solc = require('solc')
@@ -9,8 +8,8 @@ web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
 
 compiled = solc.compile({sources : {
     'Core.sol' : fs.readFileSync('contracts/Core.sol').toString(),
+    'Democratic.sol' : fs.readFileSync('contracts/Democratic.sol').toString(),
     'Restricted.sol': fs.readFileSync('contracts/Restricted.sol').toString(),
-    'Democratic.sol': fs.readFileSync('contracts/Democratic.sol').toString(),
     'Token.sol':fs.readFileSync('contracts/Token.sol').toString(),
     'Ibis.sol': fs.readFileSync('contracts/Ibis.sol').toString()
 }}, 1);
@@ -23,8 +22,9 @@ bytecode_ibis = compiled.contracts['Ibis.sol:Ibis'].bytecode
 
 contract_core = new web3.eth.Contract(abi_core)
 contract_ibis = new web3.eth.Contract(abi_ibis)
-
 contract_core.options.data = bytecode_core
+
+// need to find a way to record account address
 
 contract_core.deploy({arguments: []}).send({from: account_address, gas:4700000, gasPrice: '30000000'}).then(function(newContractInstance){ contract_core.options.address = newContractInstance.options.address;});
 
@@ -53,10 +53,11 @@ contract_ibis.methods.transfer(account_address, 50).call({from: account_address}
 
 //-------------------------------------------
 
+
 compiled = solc.compile({sources : {
     'Core.sol' : fs.readFileSync('contracts/Core.sol').toString(),
+    'Democratic.sol' : fs.readFileSync('contracts/Democratic.sol').toString(),
     'Restricted.sol': fs.readFileSync('contracts/Restricted.sol').toString(),
-    'Democratic.sol': fs.readFileSync('contracts/Democratic.sol').toString(),
     'Token.sol':fs.readFileSync('contracts/Token.sol').toString(),
     'Ibis.sol': fs.readFileSync('contracts/Ibis.sol').toString()
 }}, 1);
@@ -81,3 +82,4 @@ contract_ibis.methods.deposit().send({from: account_address, gas: 900000, value:
 contract_ibis.methods.transfer(account_address_2, 1500000).send({from: account_address, gas: 900000}).then(console.log)
 
 web3.eth.getBalance(account_address_2).then(console.log)
+*/
