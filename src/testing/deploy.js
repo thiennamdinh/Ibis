@@ -7,11 +7,11 @@ solc = require('solc')
 web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
 
 compiled = solc.compile({sources : {
-    'Core.sol' : fs.readFileSync('contracts/Core.sol').toString(),
-    'Democratic.sol' : fs.readFileSync('contracts/Democratic.sol').toString(),
-    'Restricted.sol': fs.readFileSync('contracts/Restricted.sol').toString(),
-    'Token.sol':fs.readFileSync('contracts/Token.sol').toString(),
-    'Ibis.sol': fs.readFileSync('contracts/Ibis.sol').toString()
+    'Core.sol' : fs.readFileSync('../contracts/Core.sol').toString(),
+    'Democratic.sol' : fs.readFileSync('../contracts/Democratic.sol').toString(),
+    'Restricted.sol': fs.readFileSync('../contracts/Restricted.sol').toString(),
+    'Token.sol':fs.readFileSync('../contracts/Token.sol').toString(),
+    'Ibis.sol': fs.readFileSync('../contracts/Ibis.sol').toString()
 }}, 1);
 
 abi_core = JSON.parse(compiled.contracts['Core.sol:Core'].interface)

@@ -1,0 +1,20 @@
+White Paper
+
+- Intro
+- Stages
+  - initial
+  - mass adoption
+  - conference
+- Vision
+  - why blockchain
+  - philanthropy
+  - help
+- Conclusion
+
+Code Overview
+
+- Components
+- Core
+- Business logic
+- Restrictions
+- Democratic
