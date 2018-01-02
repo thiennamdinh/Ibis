@@ -41,16 +41,16 @@ contract Democratic {
 	}
     }
 
-    function Democratic(uint _voteDuration, uint _maxSuspensions) {
+    function Democratic(uint _voteDuration, uint _maxSuspensions) public {
 	voteDuration = _voteDuration;
 	maxSuspensions = _maxSuspensions;
     }
 
-    function register() {
+    function register() public {
 	votingBalance[msg.sender] = purchaseVotes(msg.sender);
     }
 
-    function unregister(address _addr) {
+    function unregister(address _addr) public {
 
 	// allow user to clear their own vote if they are not participating in any issues
 	if(_addr == msg.sender && numParticipating[msg.sender] == 0 && returnVotes(_addr)) {
@@ -63,7 +63,7 @@ contract Democratic {
 	}
     }
 
-    function vote(bytes32 _operation, bool _supporting) {
+    function vote(bytes32 _operation, bool _supporting) public {
 
 	// already voted on this issue
 	if(issues[_operation].supporting[msg.sender] + issues[_operation].dissenting[msg.sender] != 0) {
@@ -83,7 +83,7 @@ contract Democratic {
 	numParticipating[msg.sender]++;
     }
 
-    function unvote(bytes32 _operation) {
+    function unvote(bytes32 _operation) public {
 
 	// user hasn't voted on this issue
 	if(issues[_operation].supporting[msg.sender] + issues[_operation].dissenting[msg.sender] == 0) {
@@ -100,7 +100,7 @@ contract Democratic {
     }
 
     // Allow anybody to clear the space taken by a prior issue vote
-    function clearVote(bytes32 _operation, address _addr) {
+    function clearVote(bytes32 _operation, address _addr) public {
 	if(block.number < issues[_operation].initBlock + voteDuration) {
 	    if(issues[_operation].supporting[_addr] + issues[_operation].dissenting[_addr] != 0) {
 		numParticipating[msg.sender]--;
@@ -144,11 +144,11 @@ contract Democratic {
 
     ///---------------------------------- Abstract Methods ----------------------------------///
 
-    function purchaseVotes(address _addr) internal returns (uint) {
+    function purchaseVotes(address) internal pure returns (uint) {
 	// implement in child to freeze funds, etc
     }
 
-    function returnVotes(address _addr) internal returns (bool) {
+    function returnVotes(address) internal pure returns (bool) {
 	// implement in child to unfreeze funds, etc
     }
 }

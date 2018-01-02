@@ -39,47 +39,47 @@ contract Core {
 	_;
     }
 
-    function Core() {
+    function Core() public {
 	controller = msg.sender;
     }
 
-    function upgrade(address _addr) {
+    function upgrade(address _addr) public {
 	controller = _addr;
     }
 
-    function addApproved(address _addr) isController {
+    function addApproved(address _addr) public isController {
 	approved[_addr] = true;
     }
 
-    function removeApproved(address _addr) isController {
+    function removeApproved(address _addr) public isController {
 	approved[_addr] = false;
     }
 
-    function setBalances(address _addr, uint _value) isApproved {
+    function setBalances(address _addr, uint _value) public isApproved {
 	balances[_addr] = _value;
     }
 
-    function setCharityStatus(address _addr, bool _status) isApproved {
+    function setCharityStatus(address _addr, bool _status) public isApproved {
 	charityStatus[_addr] = _status;
     }
 
-    function setCharityBlocknum(address _addr, uint _blocknum) isApproved {
+    function setCharityBlocknum(address _addr, uint _blocknum) public isApproved {
 	charityBlocknum[_addr] = _blocknum;
     }
 
-    function setAllowed(address _addr, address _allowed, uint _value) isApproved {
+    function setAllowed(address _addr, address _allowed, uint _value) public isApproved {
 	allowed[_addr][_allowed] = _value;
     }
 
-    function setFrozenValue(address _addr, uint _value) isApproved {
+    function setFrozenValue(address _addr, uint _value) public isApproved {
 	frozenValue[_addr] = _value;
     }
 
-    function setFrozenBlocknum(address _addr, uint _blocknum) isApproved {
+    function setFrozenBlocknum(address _addr, uint _blocknum) public isApproved {
 	frozenBlocknum[_addr] = _blocknum;
     }
 
-    function transfer(address _to, address _from,  uint _value) isApproved {
+    function transfer(address _to, address _from,  uint _value) public isApproved {
 	balances[_to] -= _value;
 	balances[_from] += _value;
     }

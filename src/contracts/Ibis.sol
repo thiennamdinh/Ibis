@@ -8,13 +8,14 @@
 
 pragma solidity ^0.4.13;
 
-import "./Token.sol";
+import "./ERC20.sol";
+import "./ERC223.sol";
 import "./Restricted.sol";
 import "./Democratic.sol";
 import "./Core.sol";
 
 /// Implements the Ibis charity currency as an ERC20 token.
-contract Ibis is Token, Restricted, Democratic {
+contract Ibis is ERC20, ERC223, Restricted, Democratic {
 
     // constant values
     uint MAX_UINT256 = 2**256-1;                 // maximum unsigned integer value
@@ -23,6 +24,9 @@ contract Ibis is Token, Restricted, Democratic {
     uint constant VOTE_DURATION = 960 * 7;       // # of blocks per voting period
     uint constant MAX_NUKES = 3;                 // # of nukes available to nuke master
 
+    uint delayDuration = 10;
+    // note: approximately 960 blocks are mined daily at the moment
+
     // human standard token fields
     string public name = "Ibis";
     string public symbol = "IBI";
@@ -30,7 +34,7 @@ contract Ibis is Token, Restricted, Democratic {
     uint8 public decimals = 18;
 
     // address of core contract core
-    Core core;
+    Core public core;
 
     // address freezing/redistribution
     uint public awardMax;                      // maximum award that can be claimed in one block
@@ -56,8 +60,9 @@ contract Ibis is Token, Restricted, Democratic {
     event LogUpgrade(address _addr);
 
     /// Define restricted ownership, voting parameters, and the Core contract
-    function Ibis(address _core, address [] _owners, uint _ownerThreshold, address nukeMaster)
-        Restricted(_owners, _ownerThreshold, nukeMaster) Democratic(VOTE_DURATION, MAX_NUKES)
+    function Ibis(address _core, address [] _owners, uint _ownerThreshold, address nukeMaster) public
+        Restricted(_owners, _ownerThreshold, nukeMaster, delayDuration)
+	Democratic(VOTE_DURATION, MAX_NUKES)
     {
 	graceInit = block.number;
 	core = Core(_core);
@@ -66,21 +71,41 @@ contract Ibis is Token, Restricted, Democratic {
     ///-------------------------------- User Account Methods --------------------------------///
 
     // Return the balance of an address
-    function balanceOf(address _owner) constant returns (uint) {
+    function balanceOf(address _owner) public constant returns (uint) {
 	return core.balances(_owner);
     }
 
     /// Transfer value from the sending address to a given recipient
-    function transfer(address _to, uint _value) returns (bool) {
+    function transfer(address _to, uint _value) public returns (bool) {
 	if(core.balances(msg.sender) >= _value) {
 	    core.transfer(msg.sender, _to, _value);
+
+	    bytes memory empty;
 	    Transfer(msg.sender, _to, _value);
+	    Transfer(msg.sender, _to, _value, empty);
 	    return true;
 	}
     }
 
+    function transfer(address _to, uint _value, bytes _data) public {
+	if(core.balances(msg.sender) >= _value) {
+	    // Retrieve the size of the code on target address
+	    uint codeLength;
+	    assembly {
+	    codeLength := extcodesize(_to)
+		    }
+
+	    core.transfer(msg.sender, _to, _value);
+	    if(codeLength>0) {
+		ERC223ReceivingContract receiver = ERC223ReceivingContract(_to);
+		receiver.tokenFallback(msg.sender, _value, _data);
+	    }
+	    Transfer(msg.sender, _to, _value, _data);
+	}
+    }
+
     /// Transfer value on behalf of another account if approved by the owner
-    function transferFrom(address _from, address _to, uint _value) returns (bool) {
+    function transferFrom(address _from, address _to, uint _value) public returns (bool) {
         if(core.balances(_from) >= _value && core.allowed(_from, msg.sender) >= _value) {
 	    core.transfer(_from, _to, _value);
 	    core.setAllowed(_from, msg.sender, core.allowed(_from, msg.sender) - _value);
@@ -90,59 +115,63 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Convert Ether to Ibis coins for the message sender
-    function deposit() payable {
+    function deposit() public payable {
 	depositTo(msg.sender);
     }
 
     /// Convert Ether to Ibis coins for an address other than the message sender
-    function depositTo(address _to) payable {
+    function depositTo(address _to) public payable {
         core.setBalances(_to, core.balances(_to) + msg.value);
 	totalSupply += msg.value;
 	LogDeposit(_to, msg.value);
     }
 
     /// Convert Ibis coins to Ether for message sender
-    function withdraw(uint _value) suspendable returns (bool) {
-	if ((core.charityStatus(msg.sender) || nuked) && _value <= core.balances(msg.sender)) {
-	    core.setBalances(msg.sender, core.balances(msg.sender) - _value);
-	    totalSupply -= _value;
-	    msg.sender.transfer(_value);
-	    LogWithdraw(msg.sender, _value);
-	    return true;
-	}
+    function withdraw(uint _value) public suspendable returns (bool) {
+	return withdrawHelper(msg.sender, _value);
     }
 
     /// Convert Ibis coins to Ether for someone other than message sender (requires pre-approval)
-    function withdrawFrom(address _from, uint _value) suspendable returns (bool) {
-	if((core.charityStatus(_from) || nuked) && core.balances(_from) >= _value &&
-	   core.allowed(_from, msg.sender) >= _value) {
+    function withdrawFrom(address _from, uint _value) public suspendable returns (bool) {
+	if(core.allowed(_from, msg.sender) >= _value) {
+	    return withdrawHelper(_from, _value);
+	}
+    }
+
+    /// Convert Ibis coins to Ether on behalf of a charity by an Ibis owner address
+    function withdrawOwner(address _from, uint _value) public isOwner suspendable returns (bool) {
+	return withdrawHelper(_from, _value);
+    }
+
+    /// Internal logic for public withdraw interfaces
+    function withdrawHelper(address _from, uint _value) public returns (bool) {
+	if ((core.charityStatus(_from) || nuked) && _value <= core.balances(_from)) {
 	    core.setBalances(_from, core.balances(_from) - _value);
-	    core.setAllowed(_from, msg.sender, core.allowed(_from, msg.sender) - _value);
 	    totalSupply -= _value;
 	    _from.transfer(_value);
 	    LogWithdraw(_from, _value);
 	    return true;
- 	}
+	}
     }
 
     /// Approve a third party address to manage funds on behalf of the owner
-    function approve(address _spender, uint _value) returns (bool) {
+    function approve(address _spender, uint _value) public returns (bool) {
 	core.setAllowed(msg.sender, _spender, _value);
 	Approval(msg.sender, _spender, _value);
 	return true;
     }
 
     /// Return the amount by which a third party is approved to transfer an owner's funds
-    function allowance(address _owner, address _spender) constant returns (uint) {
+    function allowance(address _owner, address _spender) public constant returns (uint) {
 	return core.allowed(_owner, _spender);
     }
 
     /// Approve a third party to manange funds and callback a predesignated function signature
-    function approveAndCall(address _spender, uint _value, bytes _extraCore) returns (bool) {
+    function approveAndCall(address _spender, uint _value, bytes _extraCore) public returns (bool) {
         core.setAllowed(msg.sender, _spender, _value);
         Approval(msg.sender, _spender, _value);
 
-        if(!_spender.call(bytes4(sha3("receiveApproval(address,uint,address,bytes)")),
+        if(!_spender.call(bytes4(keccak256("receiveApproval(address,uint,address,bytes)")),
 			  msg.sender, _value, this, _extraCore)) {
 	    revert();
 	}
@@ -150,7 +179,7 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Approve a new charity
-    function addCharity(address _charity) isOwner delayed(sha3(msg.data)) returns (bool) {
+    function addCharity(address _charity) public isOwner delayed(keccak256(msg.data)) returns (bool) {
 	if(!core.charityStatus(_charity)) {
 	    core.setCharityStatus(_charity, true);
 	    core.setCharityBlocknum(_charity, block.number);
@@ -160,7 +189,7 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Remove an existing charity
-    function removeCharity(address _charity) isOwner delayed(sha3(msg.data)) returns (bool) {
+    function removeCharity(address _charity) public isOwner delayed(keccak256(msg.data)) returns (bool) {
 	if(core.charityStatus(_charity)) {
 	    core.setCharityStatus(_charity, false);
 	    core.setCharityBlocknum(_charity, 0);
@@ -172,7 +201,7 @@ contract Ibis is Token, Restricted, Democratic {
     ///---------------------------------- Freeze Methods ------------------------------------///
 
     /// Suspend accounts by moving the existing balance into a frozen funds table
-    function freezeAccounts(address[] _accounts) isOwner suspendable {
+    function freezeAccounts(address[] _accounts) public isOwner suspendable {
 	uint blocknum = block.number;
 	for(uint i = 0; i < _accounts.length; i++) {
 	    uint balance = core.balances(_accounts[i]);
@@ -184,7 +213,8 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Reinstantiate frozen accounts
-    function unfreezeAccounts(address[] _accounts) isOwner delayed(sha3(msg.data)) suspendable {
+    function unfreezeAccounts(address[] _accounts) public isOwner delayed(keccak256(msg.data))
+	suspendable {
 	for(uint i = 0; i < _accounts.length; i++) {
 	    uint frozen = core.frozenValue(_accounts[i]);
 	    core.setFrozenValue(_accounts[i], 0);
@@ -195,7 +225,9 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Liquidate frozen accounts and offer funds as reward for a randomly selected charity
-    function awardExcess(address[] _accounts) multiowner(sha3(msg.data)) delayed(sha3(msg.data)) {
+    function awardExcess(address[] _accounts) public multiowner(keccak256(msg.data))
+	delayed(keccak256(msg.data)) votable(keccak256(msg.data), MAJORITY, false) {
+
 	uint frozenAward;
 
 	for(uint i = 0; i < _accounts.length; i++) {
@@ -219,7 +251,7 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Claim that a charity is the closest to the random target for a given award
-    function claimAward(uint _blocknum, address _charity) suspendable returns (bool) {
+    function claimAward(uint _blocknum, address _charity) public suspendable returns (bool) {
 
 	uint target = uint(address(block.blockhash(_blocknum)));
 	uint closest = uint(awardClosest[_blocknum]);
@@ -233,7 +265,7 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Move funds into the balance of a winning charity after enough time has passed
-    function cashAward(uint _blocknum, address _charity) suspendable returns (bool) {
+    function cashAward(uint _blocknum, address _charity) public suspendable returns (bool) {
 	if(_blocknum <= block.number - awardMinTime && awardClosest[_blocknum] == _charity) {
 	    uint award = awardValue[_blocknum];
 	    delete awardValue[_blocknum];
@@ -245,40 +277,40 @@ contract Ibis is Token, Restricted, Democratic {
     }
 
     /// Set the minimum time for an account to be frozen before distribution (block height)
-    function setFrozenMinTime(uint _frozenMinTime) multiowner(sha3(msg.data))
-	delayed(sha3(msg.data)) {
+    function setFrozenMinTime(uint _frozenMinTime) public multiowner(keccak256(msg.data))
+	delayed(keccak256(msg.data)) {
 	frozenMinTime = _frozenMinTime;
     }
 
     /// Set the window of time that charities can claim to be the closest to an award
-    function setAwardMinTime(uint _awardMinTime) multiowner(sha3(msg.data))
-	delayed(sha3(msg.data)) {
+    function setAwardMinTime(uint _awardMinTime) public multiowner(keccak256(msg.data))
+	delayed(keccak256(msg.data)) {
 	awardMinTime = _awardMinTime;
     }
 
     /// Set the maximum amount of funds that can be placed on a single block
-    function setAwardMax(uint _awardMax) multiowner(sha3(msg.data))
-	delayed(sha3(msg.data)) {
+    function setAwardMax(uint _awardMax) public multiowner(keccak256(msg.data))
+	delayed(keccak256(msg.data)) {
 	awardMax = _awardMax;
     }
 
     ///---------------------------------- Upgrade Methods -----------------------------------///
 
     /// Standard path to propose a new controlling contract
-    function upgradeStandard(address _addr) multiowner(sha3(msg.data)) suspendable
-	votable(sha3(msg.data), MAJORITY, false) {
+    function upgradeStandard(address _addr) public multiowner(keccak256(msg.data)) suspendable
+	votable(keccak256(msg.data), MAJORITY, false) {
 	upgrade(_addr);
     }
 
     /// Emergency path to upgrade contracts if majority owner keys have been compromised
-    function upgradeInitEmergency(address _addr) isOwner suspendable
-	votable(sha3(msg.data), SUPERMAJORITY, false) {
+    function upgradeInitEmergency(address _addr) public isOwner suspendable
+	votable(keccak256(msg.data), SUPERMAJORITY, false) {
 
 	upgrade(_addr);
     }
 
     /// Emergency path to upgrade if something has gone wrong within the grace period
-    function upgradeInitial(address _addr) isOwner() {
+    function upgradeInitial(address _addr) public isOwner() {
 	if(graceInit + graceDuration < block.number) {
 	    upgrade(_addr);
 	}
@@ -296,7 +328,7 @@ contract Ibis is Token, Restricted, Democratic {
     ///---------------------------------- Nuke Methods -----------------------------------///
 
     /// Supermajority vote to nuke the contract logic and allow free ether withdrawal
-    function nuke() isMaster votable(sha3(msg.data), SUPERMAJORITY, true) {
+    function nuke() isMaster votable(keccak256(msg.data), SUPERMAJORITY, true) public {
 	RestrictedDestruct();
 	nuked = true;
     }
@@ -305,5 +337,9 @@ contract Ibis is Token, Restricted, Democratic {
 /// Abstract contract placeholder to facilitate a future transition to the next version of Ibis
 contract IbisNew {
     /// This method will be implemented in the future contract version to process legacy data
-    function init(uint totalSupply) returns (bool);
+    function init(uint totalSupply) public returns (bool);
+}
+
+contract ERC223ReceivingContract {
+    function tokenFallback(address _from, uint _value, bytes _data) public;
 }
