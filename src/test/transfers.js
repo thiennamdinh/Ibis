@@ -38,9 +38,7 @@ contract("Transfers", function(accounts) {
     });
 
     it("should linked to the Core contract", function() {
-	return Ibis.deployed().then(function(instance) {
-	    return ibis.core();
-	}).then(function(address) {
+	return ibis.core().then(function(address) {
 	    assert.equal(address, Core.address, "Core is not linked to Ibis");
 	    return core.controller();
 	}).then(function(address) {
@@ -53,9 +51,7 @@ contract("Transfers", function(accounts) {
 
     it("should accept deposits", function() {
 
-	return Ibis.deployed().then(function(instance) {
-	    ibis.deposit({from: user1, value: deposit1});
-	}).then(function() {
+	return ibis.deposit({from: user1, value: deposit1}).then(function () {
 	    return ibis.balanceOf(user1);
 	}).then(function(balance) {
 	    assert.equal(balance.toNumber(), deposit1, "balance of account 1 is incorrect");
@@ -69,9 +65,7 @@ contract("Transfers", function(accounts) {
 
     it("should transfer tokens", function() {
 
-	return Ibis.deployed().then(function(instance) {
-	    ibis.transfer(user2, transfer1, {from: user1});
-	}).then(function() {
+	return ibis.transfer(user2, transfer1, {from: user1}).then(function() {
 	    return ibis.balanceOf(user1);
 	}).then(function(balance) {
 	    assert.equal(balance.toNumber(), deposit1 - transfer1, "balance of account 1 is wrong");
@@ -91,9 +85,7 @@ contract("Transfers", function(accounts) {
 
 	var ethOld;
 
-	return Ibis.deployed().then(function(instance) {
-	    ibis.addCharity(charity1, {from: owner1});
-	}).then(function() {
+	return ibis.addCharity(charity1, {from: owner1}).then(function() {
 	    return core.charityStatus(charity1);
 	}).then(function(bool) {
 	    assert.equal(bool, false, "Should not be a charity yet");
@@ -115,7 +107,5 @@ contract("Transfers", function(accounts) {
 	    var ethNew = web3.eth.getBalance(charity1).toNumber();
 	    assert.equal(ethNew, ethOld + withdraw1, "Eth did not transfer");
 	});
-
     });
-
 });

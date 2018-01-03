@@ -28,9 +28,7 @@ contract("Owners", function(accounts) {
 
     it("should allow owners to be added", function() {
 
-	return Ibis.deployed().then(function(instance) {
-	    return ibis.owners(owner4);
-	}).then(function(bool) {
+	return ibis.owners(owner4).then(function(bool) {
 	    assert.equal(bool, false, "Owner was already registered");
 	    return ibis.addOwner(owner4, {from: owner1});
 	}).then(function() {

@@ -14,18 +14,18 @@ contract Democratic {
     }
 
     // constructor-defined constants
-    uint maxSuspensions;
-    uint voteDuration;
+    uint public maxSuspensions;
+    uint public voteDuration;
 
     // variables to track suspensions
-    uint usedSuspensions;
-    uint activeSuspensions;
+    uint public usedSuspensions;
+    uint public activeSuspensions;
 
     // variables to track voting issues
     uint activeIssues;
-    mapping(bytes32 => Issue) issues;           // map of active issues to be voted by the public
-    mapping(address => uint) numParticipating;
-    mapping(address => uint) votingBalance;  // balance that a user has spent on voting power
+    mapping(bytes32 => Issue) public issues;          // map of active issues to be voted by the public
+    mapping(address => uint) public numParticipating;
+    mapping(address => uint) public votingBalance;    // balance that a user has spent on voting power
 
     /// Function call must be approved by a majority of token stakeholders
     modifier votable(bytes32 _operation, uint percent, bool suspend) {
@@ -48,18 +48,23 @@ contract Democratic {
     }
 
     function register() public {
-	votingBalance[msg.sender] = purchaseVotes(msg.sender);
+	// cannot register if already registered
+	if(numParticipating[msg.sender] == 0) {
+	    votingBalance[msg.sender] = purchaseVotes(msg.sender);
+	}
     }
 
     function unregister(address _addr) public {
 
 	// allow user to clear their own vote if they are not participating in any issues
-	if(_addr == msg.sender && numParticipating[msg.sender] == 0 && returnVotes(_addr)) {
+	if(_addr == msg.sender && numParticipating[msg.sender] == 0) {
+	    returnVotes(_addr);
 	    delete votingBalance[_addr];
 	}
 
 	// allow anyone to clear votes if there are no issues to vote on
-	if(activeIssues == 0 && returnVotes(_addr)) {
+	if(activeIssues == 0) {
+	    returnVotes(_addr);
 	    delete votingBalance[_addr];
 	}
     }
@@ -118,7 +123,7 @@ contract Democratic {
 	private returns (bool) {
 
 	// if this is the first call then create a new issue and set the initial block time
-	if(issues[_operation].initTime != 0) {
+	if(issues[_operation].initTime == 0) {
 	    if(_suspend && usedSuspensions >= maxSuspensions) {
 		return false;
 	    }
@@ -145,11 +150,11 @@ contract Democratic {
 
     ///---------------------------------- Abstract Methods ----------------------------------///
 
-    function purchaseVotes(address) internal pure returns (uint) {
+    function purchaseVotes(address) internal returns (uint) {
 	// implement in child to freeze funds, etc
     }
 
-    function returnVotes(address) internal pure returns (bool) {
+    function returnVotes(address) internal {
 	// implement in child to unfreeze funds, etc
     }
 }

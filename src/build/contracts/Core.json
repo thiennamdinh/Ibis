@@ -789,7 +789,7 @@
                               "overloadedDeclarations": [
                                 null
                               ],
-                              "referencedDeclaration": 2608,
+                              "referencedDeclaration": 2676,
                               "type": "function (bool) pure",
                               "value": "require"
                             },
@@ -830,7 +830,7 @@
                                       "overloadedDeclarations": [
                                         null
                                       ],
-                                      "referencedDeclaration": 2605,
+                                      "referencedDeclaration": 2673,
                                       "type": "msg",
                                       "value": "msg"
                                     },
@@ -934,7 +934,7 @@
                               "overloadedDeclarations": [
                                 null
                               ],
-                              "referencedDeclaration": 2608,
+                              "referencedDeclaration": 2676,
                               "type": "function (bool) pure",
                               "value": "require"
                             },
@@ -984,7 +984,7 @@
                                       "overloadedDeclarations": [
                                         null
                                       ],
-                                      "referencedDeclaration": 2605,
+                                      "referencedDeclaration": 2673,
                                       "type": "msg",
                                       "value": "msg"
                                     },
@@ -1112,7 +1112,7 @@
                                   "overloadedDeclarations": [
                                     null
                                   ],
-                                  "referencedDeclaration": 2605,
+                                  "referencedDeclaration": 2673,
                                   "type": "msg",
                                   "value": "msg"
                                 },
@@ -3275,9 +3275,24 @@
     "1514939124926": {
       "events": {},
       "links": {},
-      "address": "0xc1dc511d8246f93c673f26ba009011b49c59e475"
+      "address": "0xcab229b95e7417d2e3073ae3a70c0e2e8ea9ada7"
+    },
+    "1514957310194": {
+      "events": {},
+      "links": {},
+      "address": "0x8564507f5d841116ba611bd3a824db36ea8015f9"
+    },
+    "1514962612937": {
+      "events": {},
+      "links": {},
+      "address": "0xd9a486314145cccaac17d7583ea6cd1797d5719a"
+    },
+    "1514965404374": {
+      "events": {},
+      "links": {},
+      "address": "0xb3c0c6d4fba6f00c59c71fedb54ed80bd8466d0c"
     }
   },
   "schemaVersion": "1.0.1",
-  "updatedAt": "2018-01-03T04:38:35.136Z"
+  "updatedAt": "2018-01-03T07:43:28.705Z"
 }

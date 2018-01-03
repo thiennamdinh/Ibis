@@ -306,9 +306,8 @@ contract Ibis is ERC20, ERC223, Restricted, Democratic {
     }
 
     /// Emergency path to upgrade contracts if majority owner keys have been compromised
-    function upgradeInitEmergency(address _addr) public isOwner suspendable
-	votable(keccak256(msg.data), SUPERMAJORITY, false) {
-
+    function upgradeEmergency(address _addr) public isOwner suspendable
+	votable(keccak256(msg.data), SUPERMAJORITY, true) {
 	upgrade(_addr);
     }
 
@@ -334,6 +333,21 @@ contract Ibis is ERC20, ERC223, Restricted, Democratic {
     function nuke() isMaster votable(keccak256(msg.data), SUPERMAJORITY, true) public {
 	RestrictedDestruct();
 	nuked = true;
+    }
+
+    ///------------------------------ Democratic Interface ------------------------------///
+
+    mapping(address => uint) votes;
+
+    function purchaseVotes(address _addr) internal returns (uint) {
+	votes[_addr] = core.balances(_addr);
+	core.setBalances(_addr, 0);
+	return votes[_addr] + core.frozenValue(_addr);
+    }
+
+    function returnVotes(address _addr) internal {
+	core.setBalances(_addr, core.balances(_addr) + votes[_addr]);
+	delete votes[_addr];
     }
 }
 
