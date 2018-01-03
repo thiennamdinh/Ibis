@@ -25,9 +25,9 @@ contract Core {
     mapping(address => uint) public balances;
     mapping(address => mapping (address => uint)) public allowed;
     mapping(address => bool) public charityStatus;
-    mapping(address => uint) public charityBlocknum;
+    mapping(address => uint) public charityTime;
     mapping(address => uint) public frozenValue;
-    mapping(address => uint) public frozenBlocknum;
+    mapping(address => uint) public frozenTime;
 
     modifier isController() {
 	require(msg.sender == controller);
@@ -63,8 +63,8 @@ contract Core {
 	charityStatus[_addr] = _status;
     }
 
-    function setCharityBlocknum(address _addr, uint _blocknum) public isApproved {
-	charityBlocknum[_addr] = _blocknum;
+    function setCharityTime(address _addr, uint _time) public isApproved {
+	charityTime[_addr] = _time;
     }
 
     function setAllowed(address _addr, address _allowed, uint _value) public isApproved {
@@ -75,8 +75,8 @@ contract Core {
 	frozenValue[_addr] = _value;
     }
 
-    function setFrozenBlocknum(address _addr, uint _blocknum) public isApproved {
-	frozenBlocknum[_addr] = _blocknum;
+    function setFrozenTime(address _addr, uint _time) public isApproved {
+	frozenTime[_addr] = _time;
     }
 
     function transfer(address _to, address _from,  uint _value) public isApproved {

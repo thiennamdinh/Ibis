@@ -3,7 +3,7 @@ pragma solidity ^0.4.13;
 contract Democratic {
 
     struct Issue {
-	uint initBlock;
+	uint initTime;
 	uint threshold;
 
 	mapping(address => uint) supporting;
@@ -29,10 +29,11 @@ contract Democratic {
 
     /// Function call must be approved by a majority of token stakeholders
     modifier votable(bytes32 _operation, uint percent, bool suspend) {
-	if(checkVotes(_operation, percent, suspend)) {
-	    _;
-	    delete issues[_operation];
+	if(!checkVotes(_operation, percent, suspend)) {
+	    assembly{stop}
 	}
+	_;
+	delete issues[_operation];
     }
 
     modifier suspendable() {
@@ -101,7 +102,7 @@ contract Democratic {
 
     // Allow anybody to clear the space taken by a prior issue vote
     function clearVote(bytes32 _operation, address _addr) public {
-	if(block.number < issues[_operation].initBlock + voteDuration) {
+	if(block.timestamp < issues[_operation].initTime + voteDuration) {
 	    if(issues[_operation].supporting[_addr] + issues[_operation].dissenting[_addr] != 0) {
 		numParticipating[msg.sender]--;
 	    }
@@ -116,8 +117,8 @@ contract Democratic {
     function checkVotes(bytes32 _operation, uint _percent, bool _suspend)
 	private returns (bool) {
 
-	// if this is the first call then create a new issue and set the initial block number
-	if(issues[_operation].initBlock != 0) {
+	// if this is the first call then create a new issue and set the initial block time
+	if(issues[_operation].initTime != 0) {
 	    if(_suspend && usedSuspensions >= maxSuspensions) {
 		return false;
 	    }
@@ -127,14 +128,14 @@ contract Democratic {
 		activeSuspensions++;
 	    }
 
-	    issues[_operation].initBlock = block.number;
+	    issues[_operation].initTime = block.timestamp;
 	    issues[_operation].threshold = _percent;
 
 	    return false;
 	}
 
 	// if the voting period has ended then tally the votes and return the result
-	if (block.number > issues[_operation].initBlock + voteDuration) {
+	if (block.timestamp > issues[_operation].initTime + voteDuration) {
 	    if(_suspend) activeSuspensions--;
 
  	    uint total = issues[_operation].supportingTotal + issues[_operation].dissentingTotal;

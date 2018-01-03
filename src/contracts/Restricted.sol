@@ -4,7 +4,6 @@ pragma solidity ^0.4.13;
 contract Restricted {
 
     uint256 MAX_UINT256 = 2**256-1;
-    uint numOwners;
     uint threshold;
     mapping(address => bool) public owners;
 
@@ -12,9 +11,10 @@ contract Restricted {
 
     mapping(bytes32 => mapping(address => bool)) supporting;
     mapping(bytes32 => uint) numSupporting;
-    mapping(bytes32 => uint) initBlock;
+    mapping(bytes32 => uint) initTime;
 
-    uint public delayDuration;
+    uint public numOwners;
+    uint public delayDuration = 1000;
 
     event LogOwnerChange(address indexed _addr, bool isOwner);
     event LogChangeThreshold(uint thresh);
@@ -31,10 +31,11 @@ contract Restricted {
 
     /// Function call must be approved by the stated threshold of owners
     modifier multiowner(bytes32 _operation) {
-	if(checkOwners(_operation)) {
-	    _;
-	    delete initBlock[_operation];
+	if(!checkOwners(_operation)) {
+	    assembly{stop}
 	}
+	_;
+	delete initTime[_operation];
     }
 
     modifier isMaster() {
@@ -43,22 +44,21 @@ contract Restricted {
 	}
     }
 
-    /// Function call will be delayed by a set number of blocks regardless of approval
+    /// Function call will be delayed by a set time regardless of approval
     modifier delayed(bytes32 _operation) {
-	if(checkDelay(_operation)) {
-	    _;
-	    delete initBlock[_operation];
+	if(!checkDelay(_operation)) {
+	    assembly{stop}
 	}
+	_;
+	delete initTime[_operation];
     }
 
     ///---------------------------------- Public Methods ------------------------------------///
 
     /// Constructor takes a list of owners and a threshold
-    function Restricted(address[] _ownerList, uint _threshold, address _masterAddress,
-			uint _delayDuration) public {
+    function Restricted(address[] _ownerList, uint _threshold, address _masterAddress) public {
 
 	threshold = _threshold;
-	delayDuration = _delayDuration;
 	LogChangeThreshold(threshold);
 
 	masterAddress = _masterAddress;
@@ -72,10 +72,13 @@ contract Restricted {
 
     /// Add address to list of owners
     function addOwner(address _owner) public multiowner(keccak256(msg.data))
-	delayed(keccak256(msg.data)) {
-	owners[_owner] = true;
-	numOwners++;
-	LogOwnerChange(_owner, true);
+	delayed(keccak256(msg.data))
+    {
+	if(owners[_owner] == false){
+	    owners[_owner] = true;
+	    numOwners++;
+	    LogOwnerChange(_owner, true);
+	}
     }
 
     /// Remove address from list of owners
@@ -117,39 +120,47 @@ contract Restricted {
 	LogChangeDelay(delayDuration);
     }
 
-    /// Cancel a currently delayed block
+    /// Cancel a currently delayed operation
     function killDelayed(bytes32 _operation) public multiowner(keccak256(msg.data)) {
-	delete initBlock[_operation];
+	delete initTime[_operation];
     }
 
     /// Allow an owner to revoke a previously approved call in a multi-owner vote
     function ownerRevoke(bytes32 _operation) public isOwner {
 	supporting[_operation][msg.sender] = false;
 	if(numSupporting[_operation] == 0) {
-	    delete initBlock[_operation];
+	    delete initTime[_operation];
 	}
     }
 
     /// Cast vote for a multi-owner function call and return true if the call has been approved
     function checkOwners(bytes32 _operation) private returns (bool) {
+
+	// if operation has already been approved then pass through
+	if(initTime[_operation] != 0) {
+	    return true;
+	}
+
+	// tally another owner vote
 	if(owners[msg.sender] == true && supporting[_operation][msg.sender] == false) {
-	    supporting[_operation][msg.sender] == true;
+	    supporting[_operation][msg.sender] = true;
 	    numSupporting[_operation]++;
+
+	    // if enough owners have approved then continue execution
 	    if(numSupporting[_operation] >= threshold) {
-		initBlock[_operation] = block.number;
+		initTime[_operation] = block.timestamp;
 		return true;
 	    }
 	}
-	return false;
     }
 
     /// Check to see if the call has been sufficiently delayed and if so return true
-    function checkDelay(bytes32 _operation) private view returns (bool) {
-	if(initBlock[_operation] == 0) {
-	    initBlock[_operation] = block.number;
+    function checkDelay(bytes32 _operation) private returns (bool) {
+	if(initTime[_operation] == 0) {
+	    initTime[_operation] = block.timestamp;
 	}
 
-	if(block.number >= initBlock[_operation] + delayDuration) {
+	if(block.timestamp >= initTime[_operation] + delayDuration) {
 	    return true;
 	}
     }

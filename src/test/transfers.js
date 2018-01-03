@@ -1,7 +1,9 @@
 var Core = artifacts.require("Core");
 var Ibis = artifacts.require("Ibis");
 
-contract("Ibis", function(accounts) {
+contract("Transfers", function(accounts) {
+
+    //todo get system params beforehand
 
     owner1 = accounts[0];
     owner2 = accounts[1];
@@ -15,17 +17,28 @@ contract("Ibis", function(accounts) {
 
     var core;
     var ibis;
+    var delay;
 
-    var deposit1 = 2e9;
-    var deposit2 = 1e9;
-    var transfer = 0.5e9;
+    var deposit1 = 4e9;
+    var deposit2 = 2e9;
+    var transfer1 = 1e9;
+    var transfer2 = 2e9;
+    var withdraw1 = 1e9;
+
+    it("should be set up", function() {
+	return Ibis.deployed().then(function(instance) {
+	    ibis = instance;
+	    return Core.deployed()
+	}).then(function(instance) {
+	    core = instance;
+	    return ibis.delayDuration();
+	}).then(function(duration) {
+	    delay = duration.toNumber();
+	});
+    });
 
     it("should linked to the Core contract", function() {
-	return Core.deployed().then(function(instance) {
-	    core = instance;
-	    return Ibis.deployed();
-	}).then(function(instance) {
-	    ibis = instance;
+	return Ibis.deployed().then(function(instance) {
 	    return ibis.core();
 	}).then(function(address) {
 	    assert.equal(address, Core.address, "Core is not linked to Ibis");
@@ -57,39 +70,52 @@ contract("Ibis", function(accounts) {
     it("should transfer tokens", function() {
 
 	return Ibis.deployed().then(function(instance) {
-	    ibis.transfer(user2, transfer, {from: user1});
+	    ibis.transfer(user2, transfer1, {from: user1});
 	}).then(function() {
 	    return ibis.balanceOf(user1);
 	}).then(function(balance) {
-	    assert.equal(balance.toNumber(), deposit1 - transfer, "balance of account 1 is wrong");
+	    assert.equal(balance.toNumber(), deposit1 - transfer1, "balance of account 1 is wrong");
 	    return ibis.balanceOf(user2);
 	}).then(function(balance) {
-	    assert.equal(balance.toNumber(), deposit2 + transfer, "balance of account 2 is wrong");
+	    assert.equal(balance.toNumber(), deposit2 + transfer1, "balance of account 2 is wrong");
+	    ibis.transfer(charity1, transfer2, {from: user2});
+	}).then(function() {
+	    return ibis.balanceOf(charity1);
+	}).then(function(balance) {
+	    assert.equal(balance.toNumber(), transfer2, "balance of account 2 is wrong");
 	});
 
     });
 
     it("should allow charities to withdraw", function() {
 
+	var ethOld;
+
 	return Ibis.deployed().then(function(instance) {
 	    ibis.addCharity(charity1, {from: owner1});
 	}).then(function() {
-	    console.log(web3.eth.getBlock(web3.eth.blockNumber).timestamp)
 	    return core.charityStatus(charity1);
 	}).then(function(bool) {
 	    assert.equal(bool, false, "Should not be a charity yet");
 	}).then(function() {
-	    for(i = 0; i < 10; i++){
-		web3.currentProvider.send({jsonrpc: "2.0", method: "evm_mine", params: [], id: 0})
-	    }
+	    var delayCmd = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delay], id: 0};
+	    web3.currentProvider.send(delayCmd)
 	}).then(function() {
-	    console.log(web3.eth.getBlock(web3.eth.blockNumber).timestamp)
 	    ibis.addCharity(charity1, {from: owner1});
 	}).then(function() {
 	    return core.charityStatus(charity1);
 	}).then(function(bool) {
+	    ethOld = web3.eth.getBalance(charity1).toNumber();
 	    assert.equal(bool, true, "Should be a charity now");
+	    ibis.withdrawOwner(charity1, withdraw1, {from: owner1});
+	}).then(function() {
+	    return ibis.balanceOf(charity1);
+	}).then(function(balance) {
+	    assert.equal(balance.toNumber(), transfer2 - withdraw1, "Charity balance did not reduce");
+	    var ethNew = web3.eth.getBalance(charity1).toNumber();
+	    assert.equal(ethNew, ethOld + withdraw1, "Eth did not transfer");
 	});
+
     });
 
 });
