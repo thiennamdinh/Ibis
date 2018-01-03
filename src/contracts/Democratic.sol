@@ -2,15 +2,16 @@ pragma solidity ^0.4.13;
 
 contract Democratic {
 
+    enum Ballot {EMPTY, SUPPORTING, DISSENTING}
+
     struct Issue {
 	uint initTime;
 	uint threshold;
 
-	mapping(address => uint) supporting;
-	mapping(address => uint) dissenting;
-
 	uint supportingTotal;
 	uint dissentingTotal;
+
+	mapping(address => Ballot) ballots;
     }
 
     // constructor-defined constants
@@ -25,7 +26,7 @@ contract Democratic {
     uint activeIssues;
     mapping(bytes32 => Issue) public issues;          // map of active issues to be voted by the public
     mapping(address => uint) public numParticipating;
-    mapping(address => uint) public votingBalance;    // balance that a user has spent on voting power
+    mapping(address => uint) public votingStake;    // balance that a user has spent on voting power
 
     /// Function call must be approved by a majority of token stakeholders
     modifier votable(bytes32 _operation, uint percent, bool suspend) {
@@ -47,43 +48,44 @@ contract Democratic {
 	maxSuspensions = _maxSuspensions;
     }
 
-    function register() public {
+    function register(uint _votes) public {
 	// cannot register if already registered
-	if(numParticipating[msg.sender] == 0) {
-	    votingBalance[msg.sender] = purchaseVotes(msg.sender);
+	if(votingStake[msg.sender] == 0) {
+	    votingStake[msg.sender] = purchaseVotes(msg.sender, _votes);
 	}
     }
 
-    function unregister(address _addr) public {
-
-	// allow user to clear their own vote if they are not participating in any issues
-	if(_addr == msg.sender && numParticipating[msg.sender] == 0) {
-	    returnVotes(_addr);
-	    delete votingBalance[_addr];
+    /// Allow users to unregister themselves if they are not actively participating
+    function unregister() public {
+	if(votingStake[msg.sender] != 0 && numParticipating[msg.sender] == 0) {
+	    delete votingStake[msg.sender];
+	    returnVotes(msg.sender);
 	}
+    }
 
-	// allow anyone to clear votes if there are no issues to vote on
-	if(activeIssues == 0) {
+    /// Allow anybody to unregister a voter if there are no active issues
+    function unregisterFor(address _addr) public {
+	if(votingStake[_addr] != 0 && activeIssues == 0) {
+	    delete votingStake[_addr];
 	    returnVotes(_addr);
-	    delete votingBalance[_addr];
 	}
     }
 
     function vote(bytes32 _operation, bool _supporting) public {
 
 	// already voted on this issue
-	if(issues[_operation].supporting[msg.sender] + issues[_operation].dissenting[msg.sender] != 0) {
+	if(issues[_operation].ballots[msg.sender] != Ballot.EMPTY) {
 	    return;
 	}
 
 	// reference the issue created in "publicVote"
 	if(_supporting) {
-	    issues[_operation].supporting[msg.sender] += votingBalance[msg.sender];
-	    issues[_operation].supportingTotal += votingBalance[msg.sender];
+	    issues[_operation].ballots[msg.sender] = Ballot.SUPPORTING;
+	    issues[_operation].supportingTotal += votingStake[msg.sender];
 	}
 	else {
-	    issues[_operation].dissenting[msg.sender] += votingBalance[msg.sender];
-	    issues[_operation].dissentingTotal += votingBalance[msg.sender];
+	    issues[_operation].ballots[msg.sender] = Ballot.DISSENTING;
+	    issues[_operation].dissentingTotal += votingStake[msg.sender];
 	}
 
 	numParticipating[msg.sender]++;
@@ -92,28 +94,29 @@ contract Democratic {
     function unvote(bytes32 _operation) public {
 
 	// user hasn't voted on this issue
-	if(issues[_operation].supporting[msg.sender] + issues[_operation].dissenting[msg.sender] == 0) {
+	if(issues[_operation].ballots[msg.sender] == Ballot.EMPTY) {
 	    return;
 	}
 
-	issues[_operation].supportingTotal -= issues[_operation].supporting[msg.sender];
-        issues[_operation].supporting[msg.sender] = 0;
-
-	issues[_operation].dissentingTotal -= issues[_operation].dissenting[msg.sender];
-	issues[_operation].dissenting[msg.sender] = 0;
+	if(issues[_operation].ballots[msg.sender] == Ballot.SUPPORTING) {
+	    issues[_operation].supportingTotal -= votingStake[msg.sender];
+	}
+	else if(issues[_operation].ballots[msg.sender] == Ballot.DISSENTING) {
+	    issues[_operation].dissentingTotal -= votingStake[msg.sender];
+	}
 
 	numParticipating[msg.sender]--;
+	issues[_operation].ballots[msg.sender] = Ballot.EMPTY;
     }
 
     // Allow anybody to clear the space taken by a prior issue vote
     function clearVote(bytes32 _operation, address _addr) public {
 	if(block.timestamp < issues[_operation].initTime + voteDuration) {
-	    if(issues[_operation].supporting[_addr] + issues[_operation].dissenting[_addr] != 0) {
-		numParticipating[msg.sender]--;
+	    if(issues[_operation].ballots[_addr] != Ballot.EMPTY) {
+		numParticipating[_addr]--;
 	    }
 
-	    delete issues[_operation].supporting[_addr];
-	    delete issues[_operation].dissenting[_addr];
+	    delete issues[_operation].ballots[_addr];
 	}
     }
 
@@ -135,22 +138,24 @@ contract Democratic {
 
 	    issues[_operation].initTime = block.timestamp;
 	    issues[_operation].threshold = _percent;
+	    activeIssues++;
 
 	    return false;
 	}
 
 	// if the voting period has ended then tally the votes and return the result
-	if (block.timestamp > issues[_operation].initTime + voteDuration) {
+	if (block.timestamp >= issues[_operation].initTime + voteDuration) {
 	    if(_suspend) activeSuspensions--;
-
+	    activeIssues--;
+	    issues[_operation].threshold = 5;
  	    uint total = issues[_operation].supportingTotal + issues[_operation].dissentingTotal;
-	    return issues[_operation].supportingTotal > total * issues[_operation].threshold;
+	    return issues[_operation].supportingTotal * 100 > total * issues[_operation].threshold;
 	}
     }
 
     ///---------------------------------- Abstract Methods ----------------------------------///
 
-    function purchaseVotes(address) internal returns (uint) {
+    function purchaseVotes(address, uint) internal returns (uint) {
 	// implement in child to freeze funds, etc
     }
 

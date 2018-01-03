@@ -17,7 +17,7 @@ contract("Transfers", function(accounts) {
 
     var core;
     var ibis;
-    var delay;
+    var delayDuration;
 
     var deposit1 = 4e9;
     var deposit2 = 2e9;
@@ -32,8 +32,8 @@ contract("Transfers", function(accounts) {
 	}).then(function(instance) {
 	    core = instance;
 	    return ibis.delayDuration();
-	}).then(function(duration) {
-	    delay = duration.toNumber();
+	}).then(function(result) {
+	    delayDuration = result.toNumber();
 	});
     });
 
@@ -90,8 +90,8 @@ contract("Transfers", function(accounts) {
 	}).then(function(bool) {
 	    assert.equal(bool, false, "Should not be a charity yet");
 	}).then(function() {
-	    var delayCmd = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delay], id: 0};
-	    web3.currentProvider.send(delayCmd)
+	    var wait = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delayDuration], id: 0};
+	    web3.currentProvider.send(wait);
 	}).then(function() {
 	    ibis.addCharity(charity1, {from: owner1});
 	}).then(function() {

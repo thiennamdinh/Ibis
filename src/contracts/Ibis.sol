@@ -306,7 +306,7 @@ contract Ibis is ERC20, ERC223, Restricted, Democratic {
     }
 
     /// Emergency path to upgrade contracts if majority owner keys have been compromised
-    function upgradeEmergency(address _addr) public isOwner suspendable
+    function upgradeEmergency(address _addr) public isOwner
 	votable(keccak256(msg.data), SUPERMAJORITY, true) {
 	upgrade(_addr);
     }
@@ -337,17 +337,19 @@ contract Ibis is ERC20, ERC223, Restricted, Democratic {
 
     ///------------------------------ Democratic Interface ------------------------------///
 
-    mapping(address => uint) votes;
+    mapping(address => uint) voteBalances;
 
-    function purchaseVotes(address _addr) internal returns (uint) {
-	votes[_addr] = core.balances(_addr);
-	core.setBalances(_addr, 0);
-	return votes[_addr] + core.frozenValue(_addr);
+    function purchaseVotes(address _addr, uint _votes) internal returns (uint) {
+	if(_votes <= core.balances(_addr)){
+	    voteBalances[_addr] += _votes;
+	    core.setBalances(_addr, core.balances(_addr) - _votes);
+	    return voteBalances[_addr] + core.frozenValue(_addr);
+	}
     }
 
     function returnVotes(address _addr) internal {
-	core.setBalances(_addr, core.balances(_addr) + votes[_addr]);
-	delete votes[_addr];
+	core.setBalances(_addr, core.balances(_addr) + voteBalances[_addr]);
+	delete voteBalances[_addr];
     }
 }
 
@@ -359,4 +361,10 @@ contract IbisNew {
 
 contract ERC223ReceivingContract {
     function tokenFallback(address _from, uint _value, bytes _data) public;
+}
+
+/// for testing
+contract IbisNewConcrete is IbisNew {
+    function IbisNewConcrete(){}
+    function init(uint /*totalSupply*/) public returns (bool){return true;}
 }

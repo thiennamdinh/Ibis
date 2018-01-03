@@ -5,7 +5,7 @@ contract("Owners", function(accounts) {
 
     var ibis;
     var core;
-    var delay;
+    var delayDuration;
 
     owner1 = accounts[0];
     owner2 = accounts[1];
@@ -21,8 +21,8 @@ contract("Owners", function(accounts) {
 	}).then(function(instance) {
 	    core = instance;
 	    return ibis.delayDuration();
-	}).then(function(duration) {
-	    delay = duration.toNumber();
+	}).then(function(result) {
+	    delayDuration = result.toNumber();
 	});
     });
 
@@ -34,8 +34,8 @@ contract("Owners", function(accounts) {
 	}).then(function() {
 	    return ibis.addOwner(owner4, {from: owner1});
 	}).then(function() {
-	    var delayCmd = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delay], id: 0};
-	    web3.currentProvider.send(delayCmd)
+	    var wait = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delayDuration], id: 0};
+	    web3.currentProvider.send(wait);
 	}).then(function() {
 	    return ibis.addOwner(owner4, {from: owner1});
 	}).then(function() {
@@ -44,8 +44,8 @@ contract("Owners", function(accounts) {
 	    assert.equal(bool, false, "Owner was added without threshold approval");
 	    return ibis.addOwner(owner4, {from: owner2});
 	}).then(function() {
-	    var delayCmd = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delay], id: 0};
-	    web3.currentProvider.send(delayCmd)
+	    var wait = {jsonrpc: "2.0", method: "evm_increaseTime", params: [delayDuration], id: 0};
+	    web3.currentProvider.send(wait);
 	}).then(function() {
 	    return ibis.addOwner(owner4, {from: owner1});
 	}).then(function() {
